@@ -1,4 +1,3 @@
-
 import cv2
 import numpy as np
 import base64
@@ -8,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 
-# Import your existing ADAS components
+# Import ADAS components from adjacent directories
 from detection.model import ADASDetector
 from segmentation.model import LaneSegmenter
 
@@ -21,7 +20,6 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Enable CORS for frontend interaction
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -30,7 +28,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize models at startup to avoid reload latency
 print("[INFO] Loading ADAS Perception Models...")
 try:
     detector = ADASDetector()
@@ -46,10 +43,10 @@ except Exception as e:
 class DetectionResult(BaseModel):
     label: str
     confidence: float
-    bbox: List[float] # [x1, y1, x2, y2]
+    bbox: List[float]
 
 class PerceptionRequest(BaseModel):
-    image_base64: str # Expects a base64 string, potentially with data:image/xxx;base64, prefix
+    image_base64: str
 
 class BatchPerceptionRequest(BaseModel):
     images_base64: List[str]
@@ -61,10 +58,8 @@ class PerceptionResponse(BaseModel):
     fps: float
 
 def decode_base64_to_image(base64_str: str) -> np.ndarray:
-    # Remove data URI prefix if present
     if "base64," in base64_str:
         base64_str = base64_str.split("base64,")[1]
-    
     try:
         img_data = base64.b64decode(base64_str)
         nparr = np.frombuffer(img_data, np.uint8)
@@ -79,10 +74,6 @@ def encode_image_to_base64(image: np.ndarray) -> str:
 
 @app.get("/health")
 async def health_check():
-    """
-    Returns the current status of the perception service, 
-    including model readiness and uptime.
-    """
     uptime_seconds = time.time() - SERVICE_START_TIME
     return {
         "status": "healthy" if MODELS_READY else "degraded",
@@ -92,39 +83,24 @@ async def health_check():
         "services": {
             "object_detection": "ready" if detector else "error",
             "lane_segmentation": "ready" if segmenter else "error"
-        },
-        "environment": "production-adas-stack"
+        }
     }
 
 @app.post("/perception/analyze", response_model=PerceptionResponse)
 async def analyze_image(request: PerceptionRequest):
-    """
-    Receives a base64 encoded image, runs multi-task perception, 
-    and returns detections + lane segmentation mask.
-    """
     if not MODELS_READY:
         raise HTTPException(status_code=503, detail="Models are not initialized.")
-
     try:
         start_time = time.time()
-        
-        # 1. Decode base64 to OpenCV image
         frame = decode_base64_to_image(request.image_base64)
-        
         if frame is None:
-            raise HTTPException(status_code=400, detail="Failed to decode image from base64 string.")
+            raise HTTPException(status_code=400, detail="Failed to decode image.")
 
-        # 2. Object Detection (YOLOv8)
         detections = detector.detect(frame)
-        
-        # 3. Lane Segmentation (DeepLabV3)
         lane_mask = segmenter.segment(frame)
-        
-        # 4. Prepare visualization mask
         mask_resized = cv2.resize(lane_mask, (frame.shape[1], frame.shape[0]))
         mask_base64 = encode_image_to_base64(mask_resized)
         
-        # 5. Telemetry
         end_time = time.time()
         inference_time = (end_time - start_time) * 1000
         fps = 1.0 / (end_time - start_time) if (end_time - start_time) > 0 else 0
@@ -135,53 +111,9 @@ async def analyze_image(request: PerceptionRequest):
             "inference_time_ms": round(inference_time, 2),
             "fps": round(fps, 1)
         }
-
     except Exception as e:
-        print(f"[ERROR] Pipeline Failure: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Inference error: {str(e)}")
-
-@app.post("/perception/analyze_batch", response_model=List[PerceptionResponse])
-async def analyze_batch(request: BatchPerceptionRequest):
-    """
-    Process a batch of images and return a list of perception results.
-    """
-    if not MODELS_READY:
-        raise HTTPException(status_code=503, detail="Models are not initialized.")
-    
-    results = []
-    
-    for idx, img_b64 in enumerate(request.images_base64):
-        try:
-            start_time = time.time()
-            frame = decode_base64_to_image(img_b64)
-            
-            if frame is None:
-                print(f"[WARNING] Skipping image {idx} due to decode failure.")
-                continue
-
-            detections = detector.detect(frame)
-            lane_mask = segmenter.segment(frame)
-            
-            mask_resized = cv2.resize(lane_mask, (frame.shape[1], frame.shape[0]))
-            mask_base64 = encode_image_to_base64(mask_resized)
-            
-            end_time = time.time()
-            inference_time = (end_time - start_time) * 1000
-            fps = 1.0 / (end_time - start_time) if (end_time - start_time) > 0 else 0
-
-            results.append({
-                "detections": detections,
-                "lane_mask_base64": mask_base64,
-                "inference_time_ms": round(inference_time, 2),
-                "fps": round(fps, 1)
-            })
-        except Exception as e:
-            print(f"[ERROR] Batch Processing error for image {idx}: {str(e)}")
-            continue
-            
-    return results
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn
-    # Use 0.0.0.0 to allow access from local network / containers
     uvicorn.run(app, host="0.0.0.0", port=8000)
