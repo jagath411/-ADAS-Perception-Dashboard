@@ -1,0 +1,7 @@
+{
+  "name": "ADAS Perception Dashboard",
+  "description": "A high-performance visualization dashboard for Advanced Driver Assistance Systems, featuring real-time object detection and lane segmentation analysis.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
