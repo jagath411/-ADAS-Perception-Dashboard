@@ -1,12 +1,10 @@
-
-import React from 'react';
-import { Detection } from './types';
+import { Detection } from './types.ts';
 
 export const COLORS = {
-  VEHICLE: '#3b82f6', // car, truck
+  VEHICLE: '#3b82f6',
   PEDESTRIAN: '#ef4444', 
-  SIGN: '#f59e0b', // traffic sign
-  LANE: '#10b981', // drivable lanes
+  SIGN: '#f59e0b',
+  LANE: '#10b981',
 };
 
 export const MOCK_DETECTIONS: Detection[] = [
@@ -16,7 +14,5 @@ export const MOCK_DETECTIONS: Detection[] = [
   { id: '4', label: 'Traffic Sign', confidence: 0.92, bbox: [85, 20, 6, 8], color: COLORS.SIGN },
 ];
 
-export const SYSTEM_PROMPT = `You are a world-class ADAS (Advanced Driver Assistance Systems) Perception Engineer at a leading automotive company like BMW. 
-Analyze the visual perception frame from a multi-task pipeline (YOLOv8 for detection, DeepLabV3 for lane segmentation). 
-Evaluate the scene using professional automotive terminology (ego-vehicle path, TTC - Time To Collision, ODD - Operational Design Domain, ISO 26262 safety implications). 
-Your goal is to provide a safety-critical assessment of the detected objects (Vehicles, Pedestrians, Signs) and the lane segmentation accuracy.`;
+export const SYSTEM_PROMPT = `You are a world-class ADAS Perception Engineer. Analyze the visual perception frame from a multi-task pipeline. 
+Evaluate the scene using professional automotive terminology (ego-vehicle path, TTC, ISO 26262 implications).`;

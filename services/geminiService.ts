@@ -1,12 +1,20 @@
-
 import { GoogleGenAI } from "@google/genai";
-import { SYSTEM_PROMPT } from "../constants";
+import { SYSTEM_PROMPT } from "../constants.tsx";
 
-const apiKey = process.env.API_KEY || '';
+// Robust check for environment variables in ESM/Local environments
+const getApiKey = () => {
+  try {
+    return (window as any).process?.env?.API_KEY || (import.meta as any).env?.VITE_API_KEY || '';
+  } catch {
+    return '';
+  }
+};
 
 export const getSceneAnalysis = async (imageData: string, detections: any[]) => {
+  const apiKey = getApiKey();
   if (!apiKey) {
-    return "API Key missing. Please check your environment configuration.";
+    console.error("Gemini API Key missing in process.env.API_KEY");
+    return "Configuration Error: API Key is missing. Please ensure process.env.API_KEY is defined.";
   }
 
   try {
@@ -16,7 +24,7 @@ export const getSceneAnalysis = async (imageData: string, detections: any[]) => 
     const imagePart = {
       inlineData: {
         mimeType: 'image/jpeg',
-        data: imageData.split(',')[1],
+        data: imageData.includes('base64,') ? imageData.split(',')[1] : imageData,
       },
     };
 
@@ -37,6 +45,6 @@ export const getSceneAnalysis = async (imageData: string, detections: any[]) => 
     return response.text || "No analysis available.";
   } catch (error) {
     console.error("Gemini API Error:", error);
-    return "Failed to analyze scene. High load or invalid request.";
+    return "The AI analysis module encountered an error. Please verify your connection or API quota.";
   }
 };

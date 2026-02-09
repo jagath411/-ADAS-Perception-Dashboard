@@ -7,11 +7,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 
-# Import ADAS components from adjacent directories
+# Updated imports to match backend folder structure
 from detection.model import ADASDetector
 from segmentation.model import LaneSegmenter
 
-# Track service start time for uptime metric
 SERVICE_START_TIME = time.time()
 
 app = FastAPI(
@@ -39,11 +38,6 @@ except Exception as e:
     detector = None
     segmenter = None
     MODELS_READY = False
-
-class DetectionResult(BaseModel):
-    label: str
-    confidence: float
-    bbox: List[float]
 
 class PerceptionRequest(BaseModel):
     image_base64: str
@@ -77,9 +71,7 @@ async def health_check():
     uptime_seconds = time.time() - SERVICE_START_TIME
     return {
         "status": "healthy" if MODELS_READY else "degraded",
-        "version": "1.0.0",
         "uptime_seconds": round(uptime_seconds, 2),
-        "timestamp": time.time(),
         "services": {
             "object_detection": "ready" if detector else "error",
             "lane_segmentation": "ready" if segmenter else "error"
